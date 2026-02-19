@@ -160,6 +160,60 @@ your-project/
         └── MEMORY.md
 ```
 
+## teamify_codex (Hybrid Mode)
+
+> **Branch: `feature/codex`**
+
+Run Agent Teams with **Opus as Leader** and **GPT-5.3-Codex as Teammates** via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
+
+### How It Works
+
+```
+Leader (Opus 4.6)  ──── Anthropic Direct API
+                         |
+Teammates (Codex)  ──── CLIProxyAPI (localhost:8317)
+                         └── claude-sonnet-4-6 → gpt-5.3-codex (alias mapping)
+```
+
+tmux session-level environment variables route new panes through CLIProxyAPI, while the Leader process stays on Anthropic Direct.
+
+### Install (Codex addon)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/treylom/teamify/feature/codex/install-codex.sh | bash
+```
+
+Or manually:
+
+```bash
+git clone -b feature/codex https://github.com/treylom/teamify.git /tmp/teamify
+cd /tmp/teamify && bash install-codex.sh
+```
+
+### Additional Requirements
+
+| Dependency | Install |
+|-----------|---------|
+| Codex CLI | `npm install -g @openai/codex && codex --login` |
+| CLIProxyAPI | `git clone https://github.com/router-for-me/CLIProxyAPI.git ~/CLIProxyAPI` |
+| OAuth Token | `cd ~/CLIProxyAPI && ./cli-proxy-api` (TUI auth) |
+
+### Dependency Check
+
+```bash
+bash .claude/scripts/setup-teamify-codex.sh           # check all
+AUTO_INSTALL=1 bash .claude/scripts/setup-teamify-codex.sh  # auto-install missing
+RUN_PROXY_TEST=1 bash .claude/scripts/setup-teamify-codex.sh  # test proxy routing
+```
+
+### Usage
+
+```
+/teamify_codex
+```
+
+Same workflow as `/teamify`, but teammates run on Codex instead of Claude.
+
 ## License
 
 MIT

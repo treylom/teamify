@@ -108,7 +108,7 @@ description: Agent Teams 역할별 스폰 프롬프트 템플릿 + 도구 할당
   </shared_memory>
 
   <leader_discipline>
-    위임 원칙 (delegation principle):
+    위임 원칙 (ddg.kang 참고):
     - 위임 가능하면 무조건 위임. 오케스트레이션에만 집중.
     - 리더가 직접 하는 것: 보고 수신/분석, 사용자 소통, 의사결정뿐.
     - 리더가 절대 안 하는 것: 구현, 리서치, 코드베이스 탐색.
@@ -145,7 +145,7 @@ description: Agent Teams 역할별 스폰 프롬프트 템플릿 + 도구 할당
     1. TEAM_PROGRESS.md에서 각 에이전트 마지막 업데이트 시간 확인
     2. 5분 이상 업데이트 없는 에이전트 → SendMessage로 상태 확인 요청
     3. 응답 없으면 → 해당 에이전트 shutdown + 새 에이전트 스폰
-    4. 교체 시 같은 이름 재사용 금지 (delegation principle)
+    4. 교체 시 같은 이름 재사용 금지 (ddg.kang 규칙)
   </agent_health_check>
 
   <constraints>
@@ -172,7 +172,7 @@ description: Agent Teams 역할별 스폰 프롬프트 템플릿 + 도구 할당
 
   <ralph_loop enabled="{{RALPH_ENABLED}}" max_iterations="{{RALPH_MAX_ITERATIONS}}">
     Ralph 루프 모드 (리뷰-피드백-수정 반복):
-    Ralph Loop: 에이전트 출력을 만족할 때까지 반복하는 패턴.
+    참조: .claude/reference/ralph-loop-research.md
 
     IF ralph_loop.enabled == true:
       워커 결과 수신 시:
@@ -1433,10 +1433,10 @@ Avoid: Overused fonts (Inter, Roboto), clichéd color schemes, predictable layou
 > **고급 프롬프트 스킬**: 이미지 생성, 리서치/팩트체크, Gemini 3, GPT-5.2 상세 전략이 필요한 경우:
 >
 > ```
-> npx skills find "prompt engineering"
+> npx skills add treylom/prompt-engineering-skills
 > ```
 >
-> 또는 https://skills.sh 에서 검색
+> 또는 https://github.com/treylom/prompt-engineering-skills
 >
 > **포함 스킬:**
 >

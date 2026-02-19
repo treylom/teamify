@@ -25,8 +25,8 @@ defaults:
       use_for: ["labeling", "classification", "triage", "small transforms"]
 
   hooks:
-    teammate_idle: ".team-os/hooks/teammate-idle-gate.js"
-    task_completed: ".team-os/hooks/task-completed-gate.js"
+    teammate_idle: ".team-os/hooks/teammate_idle_gate.sh"
+    task_completed: ".team-os/hooks/task_completed_gate.sh"
 
   artifacts_root: ".team-os/artifacts"
   bulletin_file: ".team-os/artifacts/TEAM_BULLETIN.md"
@@ -137,7 +137,7 @@ environment:
       - "all_tasks_done"       # 전체 태스크 완료
 ```
 
-**Ralph Loop 설명**:
+**Ralph Loop 참조**: `.claude/reference/ralph-loop-research.md`
 - 이름 유래: Ralph Wiggum (심슨가족). 창시자: Geoffrey Huntley
 - 핵심: Lead가 Worker 결과를 SHIP(승인) 또는 REVISE(재작업) 판정
 - OFF: 워커 결과 즉시 수락 (빠른 실행, 비용 절약)

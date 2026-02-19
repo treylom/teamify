@@ -382,7 +382,7 @@ outline.md defaults.routing_policy 기반:
 
 ## 6. 팀 공유 메모리 설계
 
-> 3계층 하이브리드 메모리 아키텍처 (Markdown + SQLite WAL + MCP Memory)
+> 상세 리서치: `.claude/reference/agent-teams-shared-memory-research.md` 참조
 
 ### 3계층 하이브리드 메모리 아키텍처
 
@@ -577,7 +577,7 @@ v2.1.45에서 해결됨:
 
 > Ralph Loop: 에이전트 출력(에러 포함)을 다시 입력으로 넣어 만족할 때까지 반복.
 > 이름 유래: Ralph Wiggum (심슨가족). 창시자: Geoffrey Huntley.
-> Ralph Loop: 에이전트 출력을 만족할 때까지 반복하는 패턴.
+> 상세 리서치: `.claude/reference/ralph-loop-research.md`
 
 ### 적용 판단 매트릭스
 

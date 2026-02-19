@@ -235,7 +235,7 @@ env_profile에 추가:
 
 Note: `agent_office_needs_root` 플래그는 제거됨. 모든 플랫폼에서 항상 AGENT_OFFICE_ROOT를 설정하므로 불필요.
 
-Why: 하드코딩된 경로 제거. 어떤 사용자 환경에서도 자동 탐색.
+Why: 하드코딩된 경로(OneDrive/Desktop/AI) 제거. 어떤 사용자 환경에서도 자동 탐색.
 AGENT_OFFICE_ROOT는 모든 플랫폼에서 항상 설정되므로 config.js가 정확한 프로젝트 루트를 찾음.
 
 **5단계: tmux 설치 확인** (env_tmux == false인 경우만)
@@ -400,7 +400,7 @@ AskUserQuestion 호출 — questions 배열에 2개 질문:
 - "OFF" → `ralph_loop.enabled = false`
 - "ON (최대 5회)" → `ralph_loop.enabled = true, max_iterations = 5`
 - "ON (최대 10회)" → `ralph_loop.enabled = true, max_iterations = 10`
-- 상세 참조: `teamify-workflow.md` 섹션 8
+- 상세 참조: `teamify-workflow.md` 섹션 8, `.claude/reference/ralph-loop-research.md`
 
 **Devil's Advocate 설정 적용**:
 - "OFF" → `devil_advocate.enabled = false`
@@ -1383,7 +1383,7 @@ IF curl 실패:
 team_id에서 핵심 키워드를 추출하여 짧고 기억하기 쉬운 이름을 자동 생성합니다:
 
 ```
-team_id: "km.ingest.web.standard"       → 추천: "web-ingest"
+team_id: "persona.tofukyung.article.v3" → 추천: "tofukyung-team"
 team_id: "km.ai-benchmark.vault.v1"     → 추천: "ai-benchmark"
 team_id: "research.prompt-writing.v2"   → 추천: "prompt-research"
 
@@ -1514,7 +1514,7 @@ Skill("teamify", args: "spawn {team_id}")
 | Split Pane = tmux 필수 | STEP 0.5에서 검증 + 플랫폼별 안내 |
 | MCP 도구 정규화 이름 | `mcp__{서버명}__{도구명}` 형식 강제 |
 | CLI 우선 정책 | Playwright CLI >> MCP (10-100x 토큰 절약) |
-| Obsidian vault 경로 | vault root 기준 상대 경로 사용 |
+| Obsidian vault 경로 | AI_Second_Brain/ prefix 금지 |
 | Dashboard Split Pane 불필요 | ops.dashboard.* → teammate_mode: "auto" |
 | WSL tmux에서 platform은 "linux" | env_profile.platform으로 WSL 별도 감지 (`uname -r` 검사) |
 | WSL에서 xdg-open 불가 | `cmd.exe /c start` 사용 (WSL→Windows interop) |

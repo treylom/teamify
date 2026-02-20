@@ -4,8 +4,9 @@
 .team-os/reports/
 .team-os/graphrag/
 .team-os/dashboard/
-.team-os/spawn-prompts/
-.team-os/consensus/
+# spawn-prompts and consensus are included in distribution
+# .team-os/spawn-prompts/
+# .team-os/consensus/
 
 # Build outputs
 *.skill

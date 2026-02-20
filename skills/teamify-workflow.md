@@ -175,6 +175,85 @@ Read(대상 파일) → 전문 읽기
      - "병렬", "동시에", "parallel" → 병렬 가능
 ```
 
+### Step 2-1.5: 관련 문서 컨텍스트 로딩 (Prerequisite Context)
+
+대상 파일 읽기 후, **스코프 한정** 방식으로 관련 변경 이력/버그 문서를 자동 수집한다.
+전체 폴더를 탐색하지 않고, **대상 파일의 관련 경로만** 확인한다.
+
+#### 탐색 범위 (3단계, 순차)
+
+```
+target_dir = 대상 파일의 디렉토리
+component_name = 대상 파일명에서 접두사 추출 (예: teamify-workflow.md → "teamify")
+
+1. 대상 파일 디렉토리
+   Glob("{target_dir}/CHANGELOG.md") → 있으면 최근 5개 ## 엔트리 추출
+   Glob("{target_dir}/BUGS.md")      → 있으면 "미해결 버그" 또는 "## Open" 섹션만 추출
+
+2. 프로젝트 루트 (target_dir과 다른 경우에만)
+   Glob("./CHANGELOG.md") → 있으면 최근 3개 ## 엔트리 추출
+   Glob("./BUGS.md")      → 있으면 "미해결" 섹션만 추출
+
+3. Bug_Reports/ 컴포넌트 매칭 (전체 스캔 금지 — 패턴 매칭만)
+   Glob("Bug_Reports/Bug-*-{component_name}*.md") → 최대 3개
+   각 파일에서 frontmatter(tags, created) + "## 문제 설명" 섹션만 추출
+   tags에 status/open 포함된 것만 사용, status/resolved는 건너뜀
+```
+
+#### 금지 패턴
+
+| 금지 | 이유 |
+|------|------|
+| `Glob("**/*.md")` | 전체 코드베이스 스캔 → 토큰 폭발 |
+| `Glob("Bug_Reports/*.md")` | 전체 버그 목록 → 무관한 노이즈 |
+| `Glob("**/CHANGELOG.md")` | 모든 하위 디렉토리 → 과도한 탐색 |
+
+#### 추출 규칙
+
+| 문서 유형 | 추출 대상 | 토큰 예산 |
+|----------|----------|----------|
+| CHANGELOG.md | `## ` 헤더 기준 최근 N개 엔트리 | ~300 토큰 |
+| BUGS.md | "미해결"/"Open" 헤더 아래 내용만 | ~200 토큰 |
+| Bug_Reports/ | frontmatter + "## 문제 설명" (최대 3파일) | ~300 토큰 |
+
+총 예산: **~800 토큰** 이내
+
+#### 출력 형식
+
+```yaml
+prerequisites:
+  source_files:     # 실제로 읽은 파일 경로 목록
+    - ".claude/skills/CHANGELOG.md"
+    - "Bug_Reports/Bug-2026-01-06-teamify-issue.md"
+  recent_changes:   # CHANGELOG에서 추출한 최근 변경
+    - "[2026-02-19] install.sh 전면 개선 — OS감지, settings.local.json 자동구성"
+  known_issues:     # BUGS.md + Bug_Reports에서 추출한 미해결 이슈
+    - "[Bug] Task 에이전트 거짓 완료 보고 — 파일 쓰기 작업은 Lead가 직접 수행"
+  risk_notes:       # 팀 구성 시 주의사항 (위 정보에서 도출)
+    - "hooks/ 최근 변경 → hooks 담당 에이전트에 주의"
+```
+
+#### 결과 없는 경우
+
+관련 문서가 하나도 없으면 조용히 빈 객체로 진행 (에러/경고 없음):
+
+```yaml
+prerequisites:
+  source_files: []
+  recent_changes: []
+  known_issues: []
+  risk_notes: []
+```
+
+#### 팀 구성 반영 (downstream)
+
+prerequisites는 이후 단계에서 다음과 같이 활용:
+
+1. **STEP 3 분석 결과 출력**: prerequisites 섹션을 팀 구성안에 포함
+2. **STEP 5 Lead 스폰 프롬프트**: prerequisites 비어있지 않으면 "Known Context" 섹션 주입
+3. **STEP 5 Worker 프롬프트**: 해당 Worker의 담당 영역과 관련된 이슈만 선별 주입
+4. **Devil's Advocate 리뷰**: "알려진 버그 재발 여부" 검토 기준 추가
+
 ### Step 2-2: Phase 의존성 그래프 구축
 
 ```

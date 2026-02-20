@@ -53,7 +53,7 @@ Plan mode에서의 실행 규칙:
 - Plan 실행 중에도 STEP 3, STEP 6의 AskUserQuestion은 반드시 호출
 
 STEP별 실행 흐름 (plan mode / 일반 mode 공통):
-  STEP 0 → (라우팅)
+  STEP 0 → (라우팅) → [첫 실행 감지 시: STEP 0-SETUP 자동]
   STEP 2-A → ⛔ AskUserQuestion 1/2 호출 (규모/모델/게이트/출력) → 응답 대기 (관성 쌓이기 전 즉시 호출)
   STEP 2-B → ⛔ AskUserQuestion 2/2 호출 (Ralph/DA) → 응답 대기 → 응답 받은 후 진행
   STEP 0.5 → (환경 감지 - 자동)
@@ -62,6 +62,9 @@ STEP별 실행 흐름 (plan mode / 일반 mode 공통):
   STEP 4-5 → (자동 실행)
   STEP 6 → ⛔ AskUserQuestion 호출 → 응답 대기 → 응답 받은 후 진행
   STEP 7-8 → (실행)
+
+setup 모드 실행 흐름:
+  STEP 0 → STEP 0-SETUP → (완료 후 종료)
 
 ⛔ 표시 지점에서 반드시 멈추고 사용자 입력을 받으세요.
 AskUserQuestion 응답 없이 다음 STEP으로 진행하면 안 됩니다.
@@ -82,6 +85,7 @@ AskUserQuestion 응답 없이 다음 STEP으로 진행하면 안 됩니다.
 | `spawn <team_id>` | 스폰 | 팀 즉시 생성 (Split Pane) |
 | `clone <team_id>` | 버전 | 기존 팀 설정 스냅샷 |
 | `inventory` | 인벤토리 | 사용 가능한 모든 리소스 표시 |
+| `setup` | 설정 | 환경 검증 + 필수 설정 자동 구성 (첫 실행 시 자동) |
 
 ### 인터랙티브 모드 (빈값)
 
@@ -95,7 +99,8 @@ AskUserQuestion({
         {"label": "스캔 (Recommended)", "description": "기존 스킬/에이전트를 분석 → Agent Teams 구성안 생성"},
         {"label": "인벤토리", "description": "사용 가능한 Skills/MCP/Agents/Commands 전체 조회"},
         {"label": "스폰", "description": "등록된 팀 템플릿으로 Split Pane 팀 즉시 생성"},
-        {"label": "카탈로그", "description": "팀 템플릿을 registry에 등록/갱신"}
+        {"label": "카탈로그", "description": "팀 템플릿을 registry에 등록/갱신"},
+        {"label": "환경설정", "description": "환경 확인 + 필수 설정 구성 (첫 실행 시 자동)"}
       ],
       "multiSelect": false
     }
@@ -107,15 +112,209 @@ AskUserQuestion({
 - "인벤토리" → `inventory` 모드로 전환
 - "스폰" → `spawn` 모드로 전환 (team_id를 추가 질문)
 - "카탈로그" → `catalog` 모드로 전환
+- "환경설정" → `setup` 모드로 전환 (STEP 0-SETUP 실행)
+
+### 첫 실행 자동 감지 (Pre-flight Check)
+
+**모든 모드 진입 전에 아래 조건을 자동 확인합니다. setup 모드 제외.**
+
+```
+first_run = false
+
+1. Read(".claude/settings.local.json") 시도:
+   → 파일 없음: first_run = true
+   → 파일 있음: "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" 키 확인
+     → 없음 또는 "1" 아님: first_run = true
+
+2. Glob(".team-os/registry.yaml"):
+   → 없음: first_run = true
+
+IF first_run == true:
+  → 사용자에게 안내:
+    "첫 실행이 감지되었습니다. 환경설정을 먼저 진행합니다."
+  → STEP 0-SETUP 자동 실행
+  → setup 완료 후 원래 요청한 모드로 복귀
+```
+
+Why: 인프라 미비 상태에서 scan/spawn 모드로 진입하면 STEP 7에서 실패.
+첫 실행 시 setup을 먼저 완료해야 안정적으로 워크플로우 실행 가능.
 
 ### 라우팅 후 다음 STEP (모드별 분기)
 
 | 모드 | 라우팅 후 다음 STEP | 이유 |
 |------|-------------------|------|
+| setup | **STEP 0-SETUP** (환경설정) | 환경 구성만 수행 후 종료 |
 | scan | **STEP 2** (사용자 선호도 수집) | 관성 축적 전 AskUserQuestion 즉시 호출 |
 | inventory | STEP 0.5 (환경 감지) | 자동 실행만 필요 |
 | spawn | STEP 7 (즉시 실행) | team_id 지정됨, 선호도 불필요 |
 | catalog | STEP 0.5 (환경 감지) | 자동 실행 후 STEP 4로 |
+| 첫 실행 | STEP 0-SETUP (자동) → 원래 모드 | 인프라 미비 시 자동 전환 |
+
+---
+
+## STEP 0-SETUP: 환경설정 (첫 실행 또는 `setup` 서브커맨드)
+
+**첫 실행 자동 감지 또는 `/teamify setup` 명시 실행 시 이 STEP을 수행합니다.**
+**목적: 최소한의 인프라를 구성하여 이후 scan/spawn 등이 정상 작동하도록 보장.**
+
+### Setup-1: 플랫폼 감지
+
+```
+1단계: WSL 감지 — Bash("uname -r 2>/dev/null")
+  - 출력에 "microsoft" 포함 → env_platform = "wsl"
+  - platform == "darwin" → env_platform = "macos"
+  - 그 외 → env_platform = "linux"
+
+2단계: 사용자에게 플랫폼 표시
+  "감지된 환경: {env_platform}"
+```
+
+### Setup-2: 필수 도구 확인
+
+```
+| 도구 | 확인 방법 | 미설치 시 대응 |
+|------|----------|--------------|
+| tmux | Bash("which tmux 2>/dev/null") | wsl/linux: "sudo apt install tmux" 안내, macos: "brew install tmux" 안내 |
+| Node.js | Bash("node --version 2>/dev/null") | "Node.js는 Agent Office(선택) 사용 시 필요합니다. https://nodejs.org" 안내 |
+```
+
+tmux 미설치 시 경고만 표시하고 계속 진행.
+Why: VS Code 터미널에서는 in-process 모드로 폴백 가능하므로 tmux가 없어도 기본 작동은 가능.
+
+### Setup-3: settings.local.json 핵심 설정 확인 + 자동 구성
+
+```
+Read(".claude/settings.local.json") 시도:
+
+CASE 1: 파일 없음
+  → 사용자에게 안내:
+    "Agent Teams 활성화를 위해 settings.local.json을 구성해야 합니다.
+     아래 명령어를 실행해주세요:"
+  → 안내 표시:
+    claude config set -p env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1
+    claude config set -p teammateMode tmux
+  → 사용자가 직접 실행하도록 안내 (자동 수정 불가 — 포맷 보존 문제)
+
+CASE 2: 파일 있음
+  1. "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" 확인
+     → 없거나 "1" 아님:
+       "Agent Teams가 비활성입니다. 아래 명령으로 활성화하세요:"
+       claude config set -p env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1
+
+  2. "teammateMode" 확인
+     → 없거나 "tmux"/"auto" 아님:
+       "Split Pane 모드가 비활성입니다. 아래 명령으로 활성화하세요:"
+       claude config set -p teammateMode tmux
+```
+
+### Setup-4: .team-os/ 디렉토리 초기화
+
+```
+Glob(".team-os/") 존재 확인:
+
+IF .team-os/ 없음:
+  Bash("mkdir -p .team-os/artifacts .team-os/hooks .team-os/spawn-prompts .team-os/consensus .team-os/graphrag .team-os/reports")
+
+IF Glob(".team-os/registry.yaml") 없음:
+  Write(".team-os/registry.yaml"):
+    version: 1
+    defaults:
+      routing:
+        lead: opus
+        category_lead: opus
+        worker: sonnet
+        low_cost: haiku
+    teams: []
+```
+
+### Setup-5: Agent Office 설치 (필수)
+
+Agent Office는 팀 대시보드로, 팀 운영 시 실시간 모니터링에 필수입니다.
+
+```
+1. Glob("agent-office/server.js") → 존재하면 agent_office_found = true → 스킵
+
+2. agent_office_found = false 일 때:
+   → 사용자에게 안내:
+     "Agent Office(팀 대시보드)가 설치되지 않았습니다.
+      teamify 전체 설치를 진행합니다."
+
+   → install.sh 실행 (2가지 방법, 순서대로 시도):
+
+   방법 A (teamify 리포가 로컬에 있는 경우):
+     Glob("teamify/install.sh") → 존재하면:
+       Bash("bash teamify/install.sh")
+
+   방법 B (없는 경우 — GitHub에서 다운로드):
+     Bash("curl -fsSL https://raw.githubusercontent.com/treylom/teamify/main/install.sh | bash")
+
+   → install.sh가 다음을 자동 수행:
+     - 필수 도구 확인 (git, node, tmux, claude)
+     - teamify 파일 설치 (.claude/commands, .claude/skills)
+     - .team-os/ 인프라 설정 (hooks, artifacts, registry)
+     - Agent Office 복사 + npm install
+     - settings.local.json 구성
+
+3. 설치 후 재확인:
+   Glob("agent-office/server.js") → 여전히 없으면:
+     "Agent Office 설치에 실패했습니다.
+      수동으로 설치하려면:
+        git clone https://github.com/treylom/teamify /tmp/teamify
+        bash /tmp/teamify/install.sh"
+```
+
+Why: Agent Office는 teamify GitHub 리포에 포함. install.sh 한 줄로 전체 인프라 설치.
+
+### Setup-6: 모델 + 컨텍스트 안내
+
+```
+현재 모델이 opus가 아니거나 1M이 아닌 경우:
+  "teamify는 opus 1M 컨텍스트에서 최적 작동합니다.
+   다음에 CC를 시작할 때: claude --model=opus[1m]
+   현재 세션에서 전환: /model opus[1m]"
+```
+
+### Setup-7: 환경 요약 출력
+
+```markdown
+## 환경설정 결과
+
+| 항목 | 상태 |
+|------|------|
+| 플랫폼 | {env_platform} |
+| tmux | ✅ 설치됨 / ❌ 미설치 (안내 표시) |
+| Agent Teams | ✅ 활성 / ❌ 비활성 (명령어 안내) |
+| teammateMode | ✅ tmux / ❌ 미설정 (명령어 안내) |
+| .team-os/ | ✅ 초기화 완료 |
+| Agent Office | ✅ 설치됨 / ❌ 설치 실패 (수동 설치 안내) |
+| 모델 | {현재 모델} (권장: opus[1m]) |
+
+환경설정이 완료되었습니다. 이제 /teamify를 사용할 수 있습니다.
+```
+
+### Setup 종료 분기
+
+```
+IF Agent Office 설치 성공 (agent_office_found == true):
+  IF setup 서브커맨드로 진입:
+    → "환경설정 완료. /teamify를 사용할 수 있습니다."
+    → 사용법 안내:
+      "/teamify — 인터랙티브 모드로 시작
+       /teamify scan <경로> — 스킬/에이전트 분석 → 팀 구성
+       /teamify inventory — 사용 가능 리소스 조회
+       /teamify spawn <team_id> — 팀 즉시 생성"
+    → 종료
+
+  IF 첫 실행 자동감지로 진입:
+    → "환경설정 완료. 원래 요청한 작업을 계속합니다."
+    → 원래 모드(scan/inventory/spawn/인터랙티브)로 복귀하여 계속 진행
+
+IF Agent Office 설치 실패:
+  → "Agent Office 설치에 실패했습니다.
+     수동 설치: git clone https://github.com/treylom/teamify /tmp/teamify && bash /tmp/teamify/install.sh
+     설치 완료 후 /teamify setup을 다시 실행하세요."
+  → 종료 (원래 모드로 복귀하지 않음)
+```
 
 ---
 
@@ -214,18 +413,15 @@ ELSE:
 | "macos" | open {url} |
 | "linux" | xdg-open {url} 2>/dev/null |
 
-**4.5단계: Agent Office 경로 감지** (env_platform에 따라 분기)
+**4.5단계: Agent Office 경로 감지** (간소화 — 2단계만)
 
-agent_office_path를 아래 순서대로 탐색 (먼저 찾은 경로 사용):
+agent_office_path를 아래 순서로 탐색 (먼저 찾은 경로 사용):
 
 1. Glob("agent-office/server.js") → 현재 프로젝트 루트에 존재하면 "agent-office"
-2. Bash("readlink -f agent-office/server.js 2>/dev/null") → symlink resolve 후 확인
-3. (WSL only) Windows 마운트 범용 탐색:
-   Bash("find /mnt/c/Users -maxdepth 6 -name server.js -path '*/agent-office/*' 2>/dev/null | head -1")
-   → 존재하면 dirname으로 추출
-4. (macOS/Linux) HOME 기반 탐색:
-   Bash("find $HOME -maxdepth 4 -name server.js -path '*/agent-office/*' 2>/dev/null | head -1")
-5. 모두 실패 → agent_office_path = null ("Agent Office 미설치")
+2. Bash("echo $AGENT_OFFICE_PATH 2>/dev/null") → 환경변수로 명시 설정된 경우 사용
+
+→ 모두 실패: agent_office_path = null
+→ null일 때: "Agent Office 미설치. 대시보드 없이 팀 운영 가능."
 
 env_profile에 추가:
 
@@ -233,10 +429,10 @@ env_profile에 추가:
 |------|-----|
 | agent_office_path | 탐색된 경로 또는 null |
 
-Note: `agent_office_needs_root` 플래그는 제거됨. 모든 플랫폼에서 항상 AGENT_OFFICE_ROOT를 설정하므로 불필요.
-
-Why: 하드코딩된 경로(OneDrive/Desktop/AI) 제거. 어떤 사용자 환경에서도 자동 탐색.
-AGENT_OFFICE_ROOT는 모든 플랫폼에서 항상 설정되므로 config.js가 정확한 프로젝트 루트를 찾음.
+Why: 광범위한 파일시스템 탐색(find /mnt/c, find $HOME)을 제거하여
+첫 설치 사용자가 불필요한 대기 없이 바로 사용 가능.
+Agent Office 미설치 시 STEP 0-SETUP에서 install.sh로 설치 안내.
+AGENT_OFFICE_ROOT는 사용 시 항상 $(pwd)로 설정.
 
 **5단계: tmux 설치 확인** (env_tmux == false인 경우만)
 - wsl/linux → Bash("which tmux") 실행, 실패 시 설치 안내: "sudo apt install tmux"
@@ -278,13 +474,16 @@ team_os_status를 아래 순서로 확인:
 **3단계**: 자동 초기화/복구 실행 (agent_office_path 참조):
 - IF 전체 bootstrap 필요 AND agent_office_path != null:
   Bash("AGENT_OFFICE_ROOT=$(pwd) node {agent_office_path}/lib/team-os-bootstrap.js") 실행
-  → 실패 시: 사용자에게 수동 설치 안내
+  → 실패 시: 수동 폴백 (아래 mkdir 방식)
 - IF 전체 bootstrap 필요 AND agent_office_path == null:
-  Bash("mkdir -p .team-os/artifacts .team-os/hooks .team-os/spawn-prompts .team-os/consensus .team-os/graphrag") 로 수동 초기화
+  Bash("mkdir -p .team-os/artifacts .team-os/hooks .team-os/spawn-prompts .team-os/consensus .team-os/graphrag .team-os/reports") 수동 초기화
+  → 사용자에게 안내: "/teamify setup으로 Agent Office를 설치하세요"
 - ELIF repair 필요 AND agent_office_path != null:
   Bash("AGENT_OFFICE_ROOT=$(pwd) node -e \"const b=require('{agent_office_path}/lib/team-os-bootstrap');console.log(JSON.stringify(b.bootstrapTeamOS(process.env.AGENT_OFFICE_ROOT||process.cwd(),{repair:true})))\"") 실행
 - ELSE:
   team_os_status = "active"
+
+Why: Agent Office 설치 시 bootstrap.js 활용으로 완전한 인프라 구성. 미설치 시 수동 폴백.
 
 **4단계**: Glob(".team-os/hooks/*") → Hook 스크립트 존재 여부
 Glob(".team-os/artifacts/*") → 아티팩트 디렉토리 존재 여부
@@ -674,7 +873,9 @@ IF agent_office_path != null:
     "Windows 브라우저에서 직접 http://localhost:3747 을 열어주세요."
 
 ELSE:
-  "Agent Office 미설치. 대시보드 없이 진행."
+  "Agent Office 미설치. /teamify setup을 실행하여 설치해주세요.
+   현재 팀은 대시보드 없이 진행됩니다.
+   진행 상황: .team-os/artifacts/TEAM_PROGRESS.md"
 ```
 
 ### 7-2.5. 공유 메모리 초기화 (CRITICAL)
@@ -1487,6 +1688,8 @@ Skill("teamify", args: "spawn {team_id}")
 | spawn | 0.5 → 1 (간략) → 7 → 8 → 9 |
 | catalog | 0.5 → 1 → 4 → (registry.yaml 저장) |
 | clone | 0.5 → (기존 팀 설정 읽기) → (스냅샷 저장) |
+| setup | 0-SETUP → (완료 후 종료 또는 원래 모드 복귀) |
+| 첫 실행 | 0 → 0-SETUP (자동) → 원래 모드 |
 
 ---
 
@@ -1523,6 +1726,8 @@ Skill("teamify", args: "spawn {team_id}")
 | 아티팩트 파일은 `.team-os/artifacts/` | 소문자 memory/ 아닌 artifacts/ 에 저장 |
 | 대시보드 파서 포맷 고정 | TEAM_PROGRESS.md `## Status Board` + 5열 테이블 필수 |
 | TEAM_BULLETIN.md 형식 고정 | `## [YYYY-MM-DD HH:MM] - Agent Name` 형식 필수 |
+| Agent Office 필수 | 미설치 시 /teamify setup으로 설치 안내. 대시보드 없이도 핵심 기능은 작동하나, 설치 권장 |
+| 첫 실행 자동 setup | settings 또는 .team-os/ 미비 시 STEP 0-SETUP 자동 실행 |
 
 ---
 
@@ -1558,7 +1763,10 @@ Skill("teamify", args: "spawn {team_id}")
 | STEP 9 | 재실행 커맨드 이름 지정 | ⛔ | STEP 8 완료 | 스킵 불가 |
 
 **실행 흐름 (scan 모드, plan mode / 일반 mode 공통):**
-STEP 0 (라우팅) → ⛔ STEP 2-A AskUserQuestion 1/2 → 응답 대기 → ⛔ STEP 2-B AskUserQuestion 2/2 → 응답 대기 → STEP 0.5-1 (환경 감지+리소스 스캔, 자동) → STEP 3 분석 → ⛔ STEP 3 AskUserQuestion → 응답 대기 → STEP 4-5 → ⛔ STEP 6 AskUserQuestion → 응답 대기 → STEP 7-8 → ⛔ STEP 9 AskUserQuestion → 응답 대기 → 커맨드 생성
+STEP 0 (라우팅) → [첫 실행 감지 시: STEP 0-SETUP 자동 실행 → 완료 후 복귀] → ⛔ STEP 2-A AskUserQuestion 1/2 → 응답 대기 → ⛔ STEP 2-B AskUserQuestion 2/2 → 응답 대기 → STEP 0.5-1 (환경 감지+리소스 스캔, 자동) → STEP 3 분석 → ⛔ STEP 3 AskUserQuestion → 응답 대기 → STEP 4-5 → ⛔ STEP 6 AskUserQuestion → 응답 대기 → STEP 7-8 → ⛔ STEP 9 AskUserQuestion → 응답 대기 → 커맨드 생성
+
+**실행 흐름 (setup 모드):**
+STEP 0 (라우팅) → STEP 0-SETUP → (완료 후 종료)
 
 Why: STEP 0.5+1의 20-30회 자동 도구 호출이 "자동 실행 관성(Momentum Effect)"을 만들어 STEP 2의 AskUserQuestion을 스킵시킴. STEP 2의 질문은 환경/리소스 정보에 의존하지 않으므로 라우팅 직후 수집.
 

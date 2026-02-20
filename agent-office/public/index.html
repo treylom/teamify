@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Office</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9881;</text></svg>">
+</head>
+<body>
+
+  <div class="header">
+    <h1>Agent Office</h1>
+    <span class="subtitle">Mission Control</span>
+    <div class="mode-toggle" id="mode-toggle">
+      <button class="mode-btn active" data-mode="dashboard" id="btn-mode-dashboard">Dashboard</button>
+      <button class="mode-btn" data-mode="results" id="btn-mode-results">Results</button>
+      <button class="mode-btn" data-mode="pixel" id="btn-mode-pixel">Pixel Office</button>
+    </div>
+    <button class="mc-clear-btn" onclick="clearSession()" title="Clear team session data">Clear</button>
+    <span class="status-dot" id="live-dot" title="Live"></span>
+  </div>
+
+  <!-- === MISSION CONTROL (top section) === -->
+  <div class="mission-control" id="mission-control">
+
+    <!-- Live Team Banner -->
+    <div class="mc-team-banner" id="mc-team-banner"></div>
+
+    <!-- Team Plan -->
+    <div class="mc-section" id="mc-plan-section">
+      <div class="mc-section-header">
+        <span class="mc-section-title">Team Plan</span>
+        <span class="mc-section-badge" id="mc-plan-status">-</span>
+      </div>
+      <div class="mc-plan" id="mc-plan"></div>
+    </div>
+
+    <!-- Live Agents -->
+    <div class="mc-section" id="mc-agents-section">
+      <div class="mc-section-header">
+        <span class="mc-section-title">Live Agents</span>
+        <span class="mc-section-badge" id="mc-agent-count">0</span>
+      </div>
+      <div class="mc-agents" id="mc-agents"></div>
+    </div>
+
+    <!-- Agent Flow (n8n-style node graph) -->
+    <div class="mc-section mc-graph-section" id="mc-graph-section">
+      <div class="mc-section-header">
+        <span class="mc-section-title">Agent Flow</span>
+        <span class="mc-section-badge" id="mc-edge-count">0</span>
+      </div>
+      <div class="mc-graph" id="mc-graph">
+        <svg id="agent-graph-svg" width="100%" height="300"></svg>
+      </div>
+    </div>
+
+    <!-- Sprint Steps (카드 기반 워크플로우 단계) -->
+    <div class="mc-section mc-sprint-section" id="mc-sprint-section">
+      <div class="mc-section-header">
+        <span class="mc-section-title">Sprint Steps</span>
+        <span class="mc-section-badge" id="mc-sprint-count">0</span>
+        <span class="mc-collapse-toggle" id="mc-sprint-toggle" onclick="toggleSprintSteps()" title="Toggle Sprint Steps">&#9660;</span>
+      </div>
+      <div class="mc-sprint-steps" id="mc-sprint-steps"></div>
+    </div>
+
+    <!-- Checkpoints + Bulletin 2-column grid -->
+    <div class="mc-bottom-grid">
+      <!-- Checkpoints -->
+      <div class="mc-section mc-checkpoints-section" id="mc-checkpoints-section">
+        <div class="mc-section-header">
+          <span class="mc-section-title">Checkpoints</span>
+        </div>
+        <div class="mc-checkpoints" id="mc-checkpoints"></div>
+      </div>
+
+      <!-- Bulletin Feed -->
+      <div class="mc-section mc-bulletin-section" id="mc-bulletin-section">
+        <div class="mc-section-header">
+          <span class="mc-section-title">Bulletin</span>
+          <span class="mc-section-badge" id="mc-bulletin-count">0</span>
+          <input type="text" id="mc-bulletin-search" class="mc-search" placeholder="Filter by agent or text..." />
+        </div>
+        <div class="mc-bulletin" id="mc-bulletin"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- === RESULTS MODE === -->
+  <div class="results-container" id="results-container" style="display:none">
+    <div class="results-header">
+      <span class="results-title">Team Execution Results</span>
+      <span class="results-count" id="results-count">0</span>
+      <div class="results-filter" id="results-filter"></div>
+    </div>
+    <div class="results-list" id="results-list"></div>
+    <div class="results-detail" id="results-detail" style="display:none">
+      <button class="results-back-btn" id="results-back-btn" onclick="showResultsList()">&larr; Back to list</button>
+      <div class="results-detail-content" id="results-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- === PIXEL OFFICE MODE === -->
+  <div class="pixel-office-container" id="pixel-office-container" style="display:none">
+    <div class="pixel-workflow-bar" id="pixel-workflow-bar"></div>
+    <canvas id="pixel-office-canvas" width="1000" height="600"></canvas>
+    <div class="pixel-office-controls" id="pixel-office-controls">
+      <button class="pixel-btn pixel-btn-active" data-time="morning">Morning</button>
+      <button class="pixel-btn" data-time="afternoon">Afternoon</button>
+      <button class="pixel-btn" data-time="evening">Evening</button>
+      <button class="pixel-btn" data-time="night">Night</button>
+    </div>
+    <div class="pixel-office-legend" id="pixel-office-legend"></div>
+  </div>
+
+  <!-- === INVENTORY GRID (bottom section) === -->
+  <div class="grid" id="dashboard">
+
+    <!-- 1. AGENTS -->
+    <div class="card" id="card-agents">
+      <div class="card-header">
+        <span class="card-title">Agents</span>
+        <span class="card-count" id="count-agents">-</span>
+      </div>
+      <div class="card-body" id="list-agents"></div>
+    </div>
+
+    <!-- 2. SKILLS -->
+    <div class="card" id="card-skills">
+      <div class="card-header">
+        <span class="card-title">Skills</span>
+        <span class="card-count" id="count-skills">-</span>
+      </div>
+      <div class="card-body" id="list-skills"></div>
+    </div>
+
+    <!-- 3. COMMANDS -->
+    <div class="card" id="card-commands">
+      <div class="card-header">
+        <span class="card-title">Commands</span>
+        <span class="card-count" id="count-commands">-</span>
+      </div>
+      <div class="card-body" id="list-commands"></div>
+    </div>
+
+    <!-- 4. MCP SERVERS -->
+    <div class="card" id="card-mcp">
+      <div class="card-header">
+        <span class="card-title">MCP Servers</span>
+        <span class="card-count" id="count-mcp">-</span>
+      </div>
+      <div class="card-body" id="list-mcp"></div>
+    </div>
+
+    <!-- 5. HOOKS -->
+    <div class="card" id="card-hooks">
+      <div class="card-header">
+        <span class="card-title">Hooks</span>
+        <span class="card-count" id="count-hooks">-</span>
+      </div>
+      <div class="card-body" id="list-hooks"></div>
+    </div>
+
+    <!-- 6. TEAM OS -->
+    <div class="card span-2" id="card-team-os">
+      <div class="card-header">
+        <span class="card-title">Team OS</span>
+        <span class="card-count" id="status-team-os">-</span>
+      </div>
+      <button class="btn-bootstrap" id="btn-team-os-bootstrap" style="display:none">Setup Team OS</button>
+      <div class="card-body" id="list-team-os"></div>
+    </div>
+
+    <!-- 7. PERMISSIONS -->
+    <div class="card span-2" id="card-permissions">
+      <div class="card-header">
+        <span class="card-title">Permissions</span>
+        <span class="card-count" id="count-permissions">-</span>
+      </div>
+      <div class="card-body" id="list-permissions"></div>
+    </div>
+
+    <!-- 8. PLUGINS -->
+    <div class="card" id="card-plugins">
+      <div class="card-header">
+        <span class="card-title">Plugins</span>
+        <span class="card-count" id="count-plugins">-</span>
+      </div>
+      <div class="card-body" id="list-plugins"></div>
+    </div>
+
+    <!-- 9. METRICS -->
+    <div class="card" id="card-metrics">
+      <div class="card-header">
+        <span class="card-title">Metrics</span>
+        <span class="card-count" id="count-metrics">-</span>
+      </div>
+      <div class="card-body" id="list-metrics"></div>
+    </div>
+
+    <!-- 10. RALPH REVIEWS -->
+    <div class="card span-2" id="card-ralph">
+      <div class="card-header">
+        <span class="card-title">Ralph Reviews</span>
+        <span class="card-count" id="count-ralph">-</span>
+      </div>
+      <div class="card-body" id="list-ralph"></div>
+    </div>
+
+  </div>
+
+  <!-- Modal Overlay -->
+  <div class="modal-overlay" id="modal-overlay" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title"></span>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer">
+    Agent Office v3.2 &mdash; <span id="timestamp"></span>
+  </div>
+
+  <script src="pixel-office.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

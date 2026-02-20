@@ -1,6 +1,6 @@
 # teamify
 
-<!-- 한국어 설명이 아래에 있습니다 · Korean description below (after English) -->
+> 🇰🇷 한국어 설명입니다. [English guide is below ↓](#teamify-english)
 
 워크플로우를 Claude Code의 Agent Teams (Split Pane / Swarm)로 자동 변환하는 오케스트레이션 프레임워크.
 

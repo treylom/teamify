@@ -1,6 +1,114 @@
 # teamify
 
+<!-- 한국어 설명이 아래에 있습니다 · Korean description below (after English) -->
+
+워크플로우를 Claude Code의 Agent Teams (Split Pane / Swarm)로 자동 변환하는 오케스트레이션 프레임워크.
+
+**설치 문서:** https://teamify-docs-jviqkn6x.manus.space/
+
+> 💡 위 URL을 Claude Code에게 전달하면 설치를 더 쉽게 도와줍니다:
+> ```
+> teamify 설치해줘: https://teamify-docs-jviqkn6x.manus.space/
+> ```
+
+---
+
+**teamify**는 기존 스킬, 에이전트, 커맨드를 분석하여 병렬화된 Agent Teams 구성을 자동 생성합니다. 스폰 프롬프트·품질 게이트·공유 메모리를 포함한 최적 팀 구성안을 즉시 실행할 수 있습니다.
+
+### 주요 기능
+
+- **동적 리소스 스캔** - 스킬, 에이전트, MCP 서버, CLI 도구 자동 발견
+- **워크플로우 분석** - 병렬화 가능한 에이전트 단위로 자동 분해
+- **전문가 도메인 프라이밍** - 27개 도메인, 137명의 전문가 페르소나
+- **Ralph Loop** - 반복적 리뷰-피드백-재작업 품질 보장 사이클
+- **Devil's Advocate** - 팀 전체 일관성을 위한 교차 리뷰
+- **3계층 공유 메모리** - Markdown + SQLite WAL + MCP Memory
+- **Agent Office 대시보드** - 실시간 진행 상황 추적 (선택)
+- **원클릭 재실행** - 자동 슬래시 커맨드 생성으로 팀 즉시 재실행
+
+### 필수 요구사항
+
+| 항목 | 요구사항 | 설치 방법 |
+|------|---------|----------|
+| Claude Code | v2.1.45+ | [공식 문서](https://docs.anthropic.com/ko/docs/claude-code) |
+| tmux | Split Pane 필수 | `sudo apt install tmux` (Linux/WSL) / `brew install tmux` (macOS) |
+| Agent Teams | 실험적 기능 활성화 | 아래 설정 참조 |
+| Node.js | v18+ (선택) | https://nodejs.org |
+
+### 설치
+
+#### 방법 1: Claude Code에게 요청 (권장)
+
+```
+teamify 설치해줘: https://github.com/treylom/teamify
+```
+
+또는 설치 문서를 직접 제공 (더 상세한 안내):
+
+```
+teamify 설치해줘: https://teamify-docs-jviqkn6x.manus.space/
+```
+
+#### 방법 2: install.sh 스크립트
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/treylom/teamify/main/install.sh | bash
+```
+
+또는 클론 후 실행:
+
+```bash
+git clone https://github.com/treylom/teamify.git /tmp/teamify
+cd /tmp/teamify && bash install.sh
+```
+
+#### 방법 3: .skill ZIP (Claude.ai)
+
+[Releases](https://github.com/treylom/teamify/releases)에서 `teamify.skill` 다운로드 후 Claude.ai에 업로드.
+
+### Agent Teams 활성화
+
+`.claude/settings.local.json`에 추가:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "teammateMode": "tmux"
+}
+```
+
+또는 자동 설정:
+
+```
+/teamify setup
+```
+
+### 사용 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `/teamify` | 인터랙티브 메뉴 |
+| `/teamify scan <경로>` | 워크플로우 분석 → 팀 구성안 생성 |
+| `/teamify inventory` | 사용 가능한 리소스 전체 조회 |
+| `/teamify spawn <team_id>` | 등록된 팀 즉시 실행 |
+| `/teamify setup` | 환경 검증 + 필수 설정 자동 구성 |
+| `/teamify catalog <team_id>` | 팀 템플릿 저장/갱신 |
+| `/teamify_codex` | GPT-Codex 하이브리드 팀 (Opus + Codex) |
+
+---
+
+# teamify (English)
+
 Convert workflows into Agent Teams (Split Pane / Swarm) for Claude Code.
+
+**Install docs:** https://teamify-docs-jviqkn6x.manus.space/
+
+> 💡 Share the URL above with Claude Code for guided installation:
+> ```
+> Install teamify: https://teamify-docs-jviqkn6x.manus.space/
+> ```
 
 **teamify** analyzes your existing skills, agents, and commands, then generates optimized Agent Teams configurations with spawn prompts, quality gates, and shared memory.
 
@@ -19,17 +127,21 @@ Convert workflows into Agent Teams (Split Pane / Swarm) for Claude Code.
 
 - **Claude Code** v2.1.45+
 - **tmux** (for Split Pane mode)
-- Agent Teams enabled: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+- Agent Teams enabled (see Setup below)
 - Recommended: `claude --model=opus[1m]` for 1M context
 
 ## Installation
 
-### Method 1: GitHub Link (Recommended)
-
-Share this repo link with Claude Code:
+### Method 1: Ask Claude Code (Recommended)
 
 ```
-Install teamify from https://github.com/treylom/teamify
+Install teamify: https://github.com/treylom/teamify
+```
+
+Or share the installation docs for step-by-step guidance:
+
+```
+Install teamify: https://teamify-docs-jviqkn6x.manus.space/
 ```
 
 ### Method 2: install.sh
@@ -48,6 +160,27 @@ cd /tmp/teamify && bash install.sh
 ### Method 3: .skill ZIP (Claude.ai)
 
 Download `teamify.skill` from [Releases](https://github.com/treylom/teamify/releases) and upload to Claude.ai. Skills only; `.team-os` infra is auto-created on first run.
+
+## Setup
+
+Enable Agent Teams in `.claude/settings.local.json`:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "teammateMode": "tmux"
+}
+```
+
+Or run the automated setup command:
+
+```
+/teamify setup
+```
+
+This verifies environment requirements and auto-configures settings (Agent Teams env var, tmux mode, hooks).
 
 ## Usage
 
@@ -90,6 +223,22 @@ Instantly creates and runs a pre-registered team from `registry.yaml`.
 ```
 
 Saves/updates a team configuration in `.team-os/registry.yaml`.
+
+### Auto-Setup Environment
+
+```
+/teamify setup
+```
+
+Verifies and configures your environment for first-time use.
+
+### Codex Hybrid Mode
+
+```
+/teamify_codex
+```
+
+Runs a hybrid team where the Lead uses Claude Opus and teammates use GPT-Codex via CLIProxyAPI.
 
 ## Architecture
 
@@ -136,17 +285,29 @@ Saves/updates a team configuration in `.team-os/registry.yaml`.
 - **Ralph Loop** - Lead reviews worker output: SHIP or REVISE (up to 10 iterations)
 - **Devil's Advocate** - 2-phase cross-cutting review after all workers complete
 
+## Platform Support
+
+| Platform | Support | Notes |
+|----------|---------|-------|
+| WSL (Ubuntu) | ✅ Best | Most stable |
+| macOS | ✅ Full | `brew install tmux` |
+| Linux | ✅ Full | `apt install tmux` |
+| Windows native | ⚠️ Limited | WSL strongly recommended |
+
 ## File Structure After Installation
 
 ```
 your-project/
 ├── .claude/
 │   ├── commands/
-│   │   └── teamify.md          # /teamify command
-│   └── skills/
-│       ├── teamify-workflow.md
-│       ├── teamify-registry-schema.md
-│       └── teamify-spawn-templates.md
+│   │   ├── teamify.md          # /teamify command
+│   │   └── teamify_codex.md    # /teamify_codex (Codex hybrid mode)
+│   ├── skills/
+│   │   ├── teamify-workflow.md
+│   │   ├── teamify-registry-schema.md
+│   │   └── teamify-spawn-templates.md
+│   └── scripts/
+│       └── setup-teamify-codex.sh
 └── .team-os/
     ├── registry.yaml
     ├── hooks/
